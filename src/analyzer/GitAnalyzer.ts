@@ -103,20 +103,27 @@ export class GitAnalyzer {
    * 获取Git提交历史
    */
   private async getCommits(): Promise<GitCommit[]> {
-    const options: any = {
-      from: this.options.since,
-      to: this.options.until,
-    };
+    const options: any = {};
 
     // 如果指定了作者，添加过滤条件
     if (this.options.author) {
       options.author = this.options.author;
     }
 
+    // 先获取所有日志，然后手动过滤日期范围
     const log = await this.git.log(options);
     const commits: GitCommit[] = [];
 
     for (const commit of log.all) {
+      // 日期范围过滤
+      const commitDate = new Date(commit.date);
+      if (this.options.since && commitDate < new Date(this.options.since)) {
+        continue;
+      }
+      if (this.options.until && commitDate > new Date(this.options.until)) {
+        continue;
+      }
+
       // 跳过合并提交（如果配置要求）
       if (!this.options.includeMerges && commit.message.startsWith('Merge')) {
         continue;
