@@ -1,0 +1,70 @@
+{
+  "name": "personal-git-report",
+  "version": "1.0.0",
+  "description": "🌟 打造属于你的年度编程回顾报告 - 轻量级的个人Git年度报告生成器",
+  "main": "dist/index.js",
+  "bin": {
+    "git-report": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "git",
+    "report",
+    "annual",
+    "statistics",
+    "developer",
+    "yearly-report",
+    "github",
+    "analytics"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/personalGitReport.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/personalGitReport/issues"
+  },
+  "homepage": "https://github.com/yourusername/personalGitReport#readme",
+  "engines": {
+    "node": ">=16.0.0",
+    "git": ">=2.20.0"
+  },
+  "dependencies": {
+    "simple-git": "^3.20.0",
+    "fs-extra": "^11.1.1",
+    "commander": "^11.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^7.0.1",
+    "inquirer": "^9.2.11",
+    "moment": "^2.29.4",
+    "chart.js": "^3.9.1",
+    "handlebars": "^4.7.8",
+    "marked": "^9.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.10",
+    "@types/fs-extra": "^11.0.2",
+    "@types/inquirer": "^9.0.7",
+    "@types/jest": "^29.5.8",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "eslint": "^8.53.0",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "prettier": "^3.0.3"
+  }
+}
