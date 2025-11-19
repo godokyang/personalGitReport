@@ -133,7 +133,7 @@ export class ReportGenerator {
         });
 
         // 读取模板
-        const templatePath = path.join(__dirname, '../templates/report.hbs');
+        const templatePath = path.join(__dirname, '../templates/report_fixed.hbs');
         const stylePath = path.join(__dirname, '../templates/style.hbs');
 
         const templateContent = await fs.readFile(templatePath, 'utf8');

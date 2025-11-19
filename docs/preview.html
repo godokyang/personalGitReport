@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025 年度编程报告 - 预览版</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f0c29;
+            --bg-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.05);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent-primary: #00f260;
+            --accent-secondary: #0575e6;
+            --accent-gradient: linear-gradient(to right, #00f260, #0575e6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Background Orbs */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.4;
+        }
+
+        .orb-1 {
+            top: -10%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: #302b63;
+        }
+
+        .orb-2 {
+            bottom: -10%;
+            right: -10%;
+            width: 40vw;
+            height: 40vw;
+            background: #0f0c29;
+        }
+
+        .orb-3 {
+            top: 40%;
+            left: 40%;
+            width: 30vw;
+            height: 30vw;
+            background: rgba(5, 117, 230, 0.2);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        /* Glass Card */
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            margin-bottom: 80px;
+            position: relative;
+        }
+
+        .profile-card {
+            display: inline-block;
+            padding: 40px 60px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .avatar {
+            width: 120px;
+            height: 120px;
+            background: var(--accent-gradient);
+            border-radius: 50%;
+            margin: 0 auto 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            color: #fff;
+            box-shadow: 0 0 30px rgba(0, 242, 96, 0.3);
+            position: relative;
+        }
+
+        .avatar::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            background: var(--accent-gradient);
+            z-index: -1;
+            opacity: 0.5;
+            filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+
+        .persona-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #00f260;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 60px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Section Headers */
+        h3 {
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        h3 i {
+            color: #00f260;
+        }
+
+        /* Charts Layout */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            margin-bottom: 40px;
+            width: 100%;
+        }
+
+        .chart-box {
+            min-height: 300px;
+            /* Reduced from 350px */
+            height: 300px;
+            /* Fixed height for better aspect ratio */
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            /* Prevent canvas overflow */
+            touch-action: pan-y;
+            /* Allow vertical scrolling on mobile */
+        }
+
+        canvas {
+            max-width: 100%;
+        }
+
+        .punch-card-box {
+            min-height: 250px;
+            height: 250px;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            touch-action: pan-y;
+        }
+
+        /* Keywords */
+        .keyword-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .keyword {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+            white-space: nowrap;
+            /* Prevent text wrap breaking layout */
+        }
+
+        .keyword:hover {
+            background: var(--accent-primary);
+            color: #000;
+            transform: scale(1.1);
+        }
+
+        /* Achievements */
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            /* Slightly smaller min-width */
+            gap: 15px;
+        }
+
+        .achievement {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+            height: 100%;
+            /* Uniform height */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .achievement.unlocked {
+            background: rgba(0, 242, 96, 0.05);
+            border-color: rgba(0, 242, 96, 0.3);
+        }
+
+        .achievement .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .achievement h4 {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .achievement p {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 80px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            opacity: 0.6;
+        }
+
+        @media (max-width: 900px) {
+
+            /* Increased breakpoint */
+            .stats-grid,
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .container {
+                padding: 40px 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="container">
+        <header class="hero">
+            <div class="profile-card glass">
+                <div class="avatar">
+                    <i class="fas fa-user-astronaut"></i>
+                </div>
+                <h1>Developer</h1>
+                <div class="persona-badge">Code Architect</div>
+                <p class="subtitle">Building the digital world, one commit at a time. Your dedication to clean code and
+                    consistent delivery sets you apart.</p>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">1,248</div>
+                        <div class="stat-label">Commits</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">52k</div>
+                        <div class="stat-label">Lines Added</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">42</div>
+                        <div class="stat-label">Day Streak</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">280</div>
+                        <div class="stat-label">Active Days</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="charts-grid">
+            <div class="glass chart-box">
+                <h3><i class="fas fa-chart-line"></i> Activity Trends</h3>
+                <canvas id="trendChart"></canvas>
+            </div>
+            <div class="glass chart-box">
+                <h3><i class="fas fa-code"></i> Languages</h3>
+                <canvas id="langChart"></canvas>
+            </div>
+        </div>
+
+        <div class="glass punch-card-box" style="margin-bottom: 40px;">
+            <h3><i class="fas fa-clock"></i> Punch Card</h3>
+            <canvas id="punchChart"></canvas>
+        </div>
+
+        <div class="charts-grid">
+            <div class="glass">
+                <h3><i class="fas fa-tags"></i> Keywords</h3>
+                <div class="keyword-cloud">
+                    <span class="keyword">feat</span>
+                    <span class="keyword">fix</span>
+                    <span class="keyword">refactor</span>
+                    <span class="keyword">api</span>
+                    <span class="keyword">component</span>
+                    <span class="keyword">style</span>
+                    <span class="keyword">test</span>
+                    <span class="keyword">docs</span>
+                    <span class="keyword">merge</span>
+                    <span class="keyword">deploy</span>
+                    <span class="keyword">config</span>
+                    <span class="keyword">init</span>
+                </div>
+            </div>
+            <div class="glass">
+                <h3><i class="fas fa-trophy"></i> Achievements</h3>
+                <div class="achievements-grid">
+                    <div class="achievement unlocked">
+                        <span class="icon">🔥</span>
+                        <h4>On Fire</h4>
+                        <p>7+ day streak</p>
+                    </div>
+                    <div class="achievement unlocked">
+                        <span class="icon">🦉</span>
+                        <h4>Night Owl</h4>
+                        <p>Late night coder</p>
+                    </div>
+                    <div class="achievement unlocked">
+                        <span class="icon">🧹</span>
+                        <h4>Clean Coder</h4>
+                        <p>High refactor ratio</p>
+                    </div>
+                    <div class="achievement">
+                        <span class="icon">🏖️</span>
+                        <h4>Weekend Warrior</h4>
+                        <p>Locked</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            Generated by Personal Git Report • 2025
+        </footer>
+    </div>
+
+    <script>
+        Chart.defaults.color = '#a0a0a0';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+        Chart.defaults.font.family = "'Outfit', sans-serif";
+
+        // Trend Chart
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Commits',
+                    data: [65, 59, 80, 81, 56, 55, 40, 70, 90, 100, 85, 45],
+                    borderColor: '#00f260',
+                    backgroundColor: (context) => {
+                        const ctx = context.chart.ctx;
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                        gradient.addColorStop(0, 'rgba(0, 242, 96, 0.2)');
+                        gradient.addColorStop(1, 'rgba(0, 242, 96, 0)');
+                        return gradient;
+                    },
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#00f260',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        bottom: 40
+                    }
+                },
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { display: true, borderDash: [5, 5] } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // Lang Chart
+        new Chart(document.getElementById('langChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['TypeScript', 'Rust', 'Python', 'Other'],
+                datasets: [{
+                    data: [45, 30, 15, 10],
+                    backgroundColor: ['#00f260', '#0575e6', '#e100ff', '#ff9900'],
+                    borderWidth: 0,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
+                }
+            }
+        });
+
+        // Punch Chart
+        const punchData = [];
+        for (let d = 0; d < 7; d++) {
+            for (let h = 0; h < 24; h++) {
+                if (Math.random() > 0.7) {
+                    punchData.push({ x: h, y: d, r: Math.random() * 15 });
+                }
+            }
+        }
+        new Chart(document.getElementById('punchChart'), {
+            type: 'bubble',
+            data: {
+                datasets: [{
+                    data: punchData,
+                    backgroundColor: '#0575e6'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 20,
+                        bottom: 40, // Increased to ensure labels are visible
+                        left: 20,
+                        right: 20
+                    }
+                },
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        type: 'category',
+                        labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                        grid: { display: false },
+                        offset: true // Ensure labels are centered and bubbles have space
+                    },
+                    x: {
+                        grid: { display: false },
+                        min: -1,
+                        max: 24,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
