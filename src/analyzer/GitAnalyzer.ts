@@ -514,14 +514,14 @@ export class GitAnalyzer {
       {
         id: 'first-commit',
         name: '初出茅庐',
-        description: '完成第一次代码提交',
+        description: `完成第一次代码提交 (当前: ${stats.totalCommits} 次)`,
         icon: '🌱',
         unlocked: stats.totalCommits > 0,
       },
       {
         id: '100-commits',
         name: '百炼成钢',
-        description: '累计提交达到 100 次',
+        description: `累计提交达到 100 次 (当前: ${stats.totalCommits} 次)`,
         icon: '🔨',
         unlocked: stats.totalCommits >= 100,
         progress: `${Math.min(stats.totalCommits, 100)}/100`
@@ -529,7 +529,7 @@ export class GitAnalyzer {
       {
         id: '1000-commits',
         name: '千锤百炼',
-        description: '累计提交达到 1000 次',
+        description: `累计提交达到 1000 次 (当前: ${stats.totalCommits} 次)`,
         icon: '⚔️',
         unlocked: stats.totalCommits >= 1000,
         progress: `${Math.min(stats.totalCommits, 1000)}/1000`
@@ -537,21 +537,21 @@ export class GitAnalyzer {
       {
         id: 'night-owl',
         name: '夜猫子',
-        description: '在深夜 (0点-5点) 提交代码超过 20 次',
+        description: '在深夜 (0点-5点) 提交代码超过 20 次', // Will be updated below
         icon: '🦉',
         unlocked: false,
       },
       {
         id: 'weekend-warrior',
         name: '周末战士',
-        description: '在周末提交代码超过 50 次',
+        description: '在周末提交代码超过 50 次', // Will be updated below
         icon: '🏖️',
         unlocked: false,
       },
       {
         id: 'consistency-king',
         name: '持之以恒',
-        description: '连续提交超过 7 天',
+        description: `连续提交超过 7 天 (最长: ${stats.streakStats.longestStreak} 天)`,
         icon: '🔥',
         unlocked: stats.streakStats.longestStreak >= 7,
         progress: `${stats.streakStats.longestStreak}/7`
@@ -559,7 +559,7 @@ export class GitAnalyzer {
       {
         id: 'polyglot',
         name: '语言大师',
-        description: '使用超过 5 种编程语言',
+        description: `使用超过 5 种编程语言 (当前: ${stats.languageStats.size} 种)`,
         icon: '🌍',
         unlocked: stats.languageStats.size >= 5,
         progress: `${stats.languageStats.size}/5`
@@ -582,7 +582,15 @@ export class GitAnalyzer {
     const nightOwl = achievements.find(a => a.id === 'night-owl');
     if (nightOwl) {
       nightOwl.unlocked = nightCommits >= 20;
+      nightOwl.description = `在深夜 (0点-5点) 提交代码超过 20 次 (当前: ${nightCommits} 次)`;
       nightOwl.progress = `${nightCommits}/20`;
+    }
+
+    const weekendWarrior = achievements.find(a => a.id === 'weekend-warrior');
+    if (weekendWarrior) {
+      weekendWarrior.unlocked = weekendCommits >= 50;
+      weekendWarrior.description = `在周末提交代码超过 50 次 (当前: ${weekendCommits} 次)`;
+      weekendWarrior.progress = `${weekendCommits}/50`;
     }
 
     // 计算更多成就
@@ -594,22 +602,20 @@ export class GitAnalyzer {
     achievements.push({
       id: 'early-bird',
       name: '早起鸟',
-      description: '在清晨 (5点-8点) 提交代码超过 10 次',
+      description: `在清晨 (5点-8点) 提交代码超过 10 次 (当前: ${earlyBird} 次)`,
       icon: '🌅',
       unlocked: earlyBird >= 10,
       progress: `${earlyBird}/10`
     });
 
-    const deletions = stats.totalDeletions;
-    const insertions = stats.totalInsertions;
-    const refactorRatio = deletions / (insertions + 1);
-
+    // 重构大师
+    const refactorRatio = stats.totalDeletions / (stats.totalInsertions || 1);
     achievements.push({
-      id: 'clean-coder',
+      id: 'refactor-master',
       name: '重构大师',
-      description: '删除的代码量接近新增代码量 (重构比例 > 0.5)',
+      description: `删除代码量接近新增代码量 (当前比例: ${refactorRatio.toFixed(2)})`,
       icon: '🧹',
-      unlocked: refactorRatio > 0.5 && deletions > 1000,
+      unlocked: refactorRatio > 0.5,
     });
 
     return achievements;

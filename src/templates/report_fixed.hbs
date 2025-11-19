@@ -11,7 +11,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        {{{css}}}
+        {
+                {
+                    {
+                    css
+                }
+            }
+        }
     </style>
 </head>
 
@@ -82,8 +88,10 @@
                     {{#each achievements}}
                     <div class="achievement {{#if unlocked}}unlocked{{else}}locked{{/if}}">
                         <div class="icon">{{this.icon}}</div>
-                        <h4>{{this.name}}</h4>
-                        <p>{{this.description}}</p>
+                        <div class="content">
+                            <h4>{{this.name}}</h4>
+                            <p>{{this.description}}</p>
+                        </div>
                     </div>
                     {{/each}}
                 </div>
