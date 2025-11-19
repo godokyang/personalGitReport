@@ -1,0 +1,16 @@
+# 依赖和构建产物
+node_modules/
+dist/
+build/
+coverage/
+
+# 模板文件 - Handlebars 语法不需要 ESLint 检查
+src/templates/*.hbs
+
+# 配置文件
+*.config.js
+.eslintrc.js
+jest.config.js
+
+# 其他
+.git/

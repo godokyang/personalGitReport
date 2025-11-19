@@ -1,0 +1,16 @@
+# 依赖和构建产物
+node_modules/
+dist/
+build/
+coverage/
+
+# 模板文件 - 避免格式化破坏 Handlebars 语法
+src/templates/report_fixed.hbs
+src/templates/*.hbs
+
+# 文档和示例
+docs/
+*.md
+
+# 其他
+.git/
