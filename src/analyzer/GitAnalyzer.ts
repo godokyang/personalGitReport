@@ -101,79 +101,134 @@ export class GitAnalyzer {
 
   /**
    * 获取Git提交历史
+   * 优化：使用 --numstat 一次性获取所有统计信息，避免 N+1 查询
    */
   private async getCommits(): Promise<GitCommit[]> {
-    const options: any = {};
+    const options: any = {
+      '--numstat': null,
+      '--format': '%H%n%aI%n%s%n%aN%n%aE', // hash, date(ISO), subject, author name, author email
+    };
 
     // 如果指定了作者，添加过滤条件
     if (this.options.author) {
-      options.author = this.options.author;
+      options['--author'] = this.options.author;
     }
 
-    // 先获取所有日志，然后手动过滤日期范围
-    const log = await this.git.log(options);
-    const commits: GitCommit[] = [];
-
-    for (const commit of log.all) {
-      // 日期范围过滤
-      const commitDate = new Date(commit.date);
-      if (this.options.since && commitDate < new Date(this.options.since)) {
-        continue;
-      }
-      if (this.options.until && commitDate > new Date(this.options.until)) {
-        continue;
-      }
-
-      // 跳过合并提交（如果配置要求）
-      if (!this.options.includeMerges && commit.message.startsWith('Merge')) {
-        continue;
-      }
-
-      // 获取详细的提交统计信息
-      const diff = await this.git.show([commit.hash, '--stat', '--format=']);
-      const stats = this.parseDiffStats(diff);
-
-      commits.push({
-        hash: commit.hash,
-        date: new Date(commit.date),
-        message: commit.message,
-        author: commit.author_name,
-        email: commit.author_email,
-        files: stats.files,
-        insertions: stats.insertions,
-        deletions: stats.deletions,
-        language: this.detectLanguage(stats.files),
-      });
+    // 日期范围过滤 (Git原生支持)
+    if (this.options.since) {
+      options['--since'] = this.options.since;
+    }
+    if (this.options.until) {
+      options['--until'] = this.options.until;
+    }
+    
+    // 排除合并提交
+    if (!this.options.includeMerges) {
+      options['--no-merges'] = null;
     }
 
-    return commits;
+    try {
+      // 获取原始日志输出
+      const logOutput = await this.git.raw(['log', ...this.buildLogArgs(options)]);
+      return this.parseRawLog(logOutput);
+    } catch (error) {
+      console.error('获取Git日志失败:', error);
+      return [];
+    }
   }
 
   /**
-   * 解析git show --stat的输出
+   * 构建 git log 参数
    */
-  private parseDiffStats(diffOutput: string): {
-    files: string[];
-    insertions: number;
-    deletions: number;
-  } {
-    const lines = diffOutput.split('\n');
-    const files: string[] = [];
-    let insertions = 0;
-    let deletions = 0;
+  private buildLogArgs(options: any): string[] {
+    const args: string[] = [];
+    for (const [key, value] of Object.entries(options)) {
+      if (value === null) {
+        args.push(key);
+      } else {
+        args.push(`${key}=${value}`);
+      }
+    }
+    return args;
+  }
 
-    for (const line of lines) {
-      // 匹配文件变更统计行: 1 file changed, 2 insertions(+), 1 deletion(-)
-      const match = line.match(/(\d+) files? changed, (\d+) insertions?\(\+\), (\d+) deletions?\(-\)/);
-      if (match) {
-        files.push(''); // 这个正则不提供具体文件名
-        insertions = parseInt(match[2], 10);
-        deletions = parseInt(match[3], 10);
-        break;
+  /**
+   * 解析原始 git log --numstat 输出
+   */
+  private parseRawLog(rawLog: string): GitCommit[] {
+    const commits: GitCommit[] = [];
+    const lines = rawLog.split('\n');
+    
+    let currentCommit: Partial<GitCommit> | null = null;
+    let state: 'meta' | 'stats' = 'meta';
+    let lineIdx = 0;
+
+    // 辅助函数：完成当前 commit 的处理并推入数组
+    const finalizeCommit = () => {
+      if (currentCommit && currentCommit.hash) {
+        // 计算语言
+        currentCommit.language = this.detectLanguage(currentCommit.files || []);
+        commits.push(currentCommit as GitCommit);
+      }
+    };
+
+    while (lineIdx < lines.length) {
+      const line = lines[lineIdx];
+      
+      // 检查是否是新 commit 的开始 (hash 是 40 位 hex)
+      // 注意：--numstat 输出中，stat 行以数字开头，meta 行是我们自定义的格式
+      // 我们定义的格式第一行是 hash
+      if (state === 'stats' && line.length === 40 && !line.includes('\t')) {
+        finalizeCommit();
+        state = 'meta';
+        currentCommit = null;
+      }
+
+      if (state === 'meta') {
+        // 读取元数据 (5行)
+        if (lineIdx + 4 >= lines.length) break;
+
+        currentCommit = {
+          hash: lines[lineIdx++],
+          date: new Date(lines[lineIdx++]),
+          message: lines[lineIdx++],
+          author: lines[lineIdx++],
+          email: lines[lineIdx++],
+          files: [],
+          insertions: 0,
+          deletions: 0,
+        };
+        
+        // 跳过可能存在的空行直到遇到 stats 或下一个 commit
+        while (lineIdx < lines.length && lines[lineIdx].trim() === '') {
+          lineIdx++;
+        }
+        state = 'stats';
+      } else {
+        // 解析 numstat 行: insertions \t deletions \t filename
+        if (line.trim() === '') {
+          lineIdx++;
+          continue;
+        }
+
+        const parts = line.split('\t');
+        if (parts.length === 3) {
+          const insertions = parts[0] === '-' ? 0 : parseInt(parts[0], 10);
+          const deletions = parts[1] === '-' ? 0 : parseInt(parts[1], 10);
+          const file = parts[2];
+
+          if (currentCommit) {
+            currentCommit.insertions = (currentCommit.insertions || 0) + (isNaN(insertions) ? 0 : insertions);
+            currentCommit.deletions = (currentCommit.deletions || 0) + (isNaN(deletions) ? 0 : deletions);
+            currentCommit.files?.push(file);
+          }
+        }
+        lineIdx++;
       }
     }
 
-    return { files, insertions, deletions };
+    finalizeCommit(); // 处理最后一个 commit
+    return commits;
   }
 
   /**

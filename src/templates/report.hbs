@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{year}} 年度编程报告</title>
+    <style>
+        {{{css}}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">{{year}} 年度编程报告</h1>
+            <p class="subtitle">🌟 {{author}} 的代码之旅回顾</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{formatNumber totalCommits}}</div>
+                <div class="stat-label">📝 总提交次数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">+{{formatNumber totalInsertions}}</div>
+                <div class="stat-label">💻 新增代码行数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{formatNumber netLines}}</div>
+                <div class="stat-label">📈 净增长代码行</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{streakStats.longestStreak}}</div>
+                <div class="stat-label">🔥 最长连续天数</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">💻 技术栈分析</h2>
+            <div class="language-chart">
+                {{#each languageStats}}
+                <div class="language-item">
+                    <div class="language-name">{{this.name}}</div>
+                    <div class="language-percentage">{{this.percentage}}%</div>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⏰ 编程时间模式</h2>
+            <p>🌅 最活跃时段分析</p>
+            <div class="time-heatmap">
+                {{#each timeStats}}
+                <div class="hour-cell"
+                    style="background: rgba(99, 102, 241, {{this.opacity}})"
+                    data-count="{{this.count}}"
+                    title="{{this.hour}}:00 - {{this.count}} 次提交">
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 项目足迹</h2>
+            <div class="project-list">
+                {{#each projectStats}}
+                <div class="project-item">
+                    <div class="project-name">📁 {{this.name}}</div>
+                    <div class="project-stats">
+                        <div class="project-stat">
+                            <span class="project-stat-value">{{this.commits}}</span>
+                            <span class="project-stat-label">提交次数</span>
+                        </div>
+                        <div class="project-stat">
+                            <span class="project-stat-value">{{this.linesFormatted}}</span>
+                            <span class="project-stat-label">代码行数</span>
+                        </div>
+                        <div class="project-stat">
+                            <span class="project-stat-value">{{this.path}}</span>
+                            <span class="project-stat-label">项目路径</span>
+                        </div>
+                    </div>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🚀 由 Personal Git Report 生成 | {{generatedDate}}</p>
+        </div>
+    </div>
+</body>
+</html>
