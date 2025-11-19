@@ -1,93 +1,228 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{year}} 年度编程报告</title>
+    <title>{{year}} 年度编程报告 - {{author}}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        {{{css}}}
+        {
+                {
+                    {
+                    css
+                }
+            }
+        }
     </style>
 </head>
+
 <body>
+    <div class="bg-animation"></div>
+
     <div class="container">
-        <div class="header">
-            <h1 class="title">{{year}} 年度编程报告</h1>
-            <p class="subtitle">🌟 {{author}} 的代码之旅回顾</p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-number">{{formatNumber totalCommits}}</div>
-                <div class="stat-label">📝 总提交次数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">+{{formatNumber totalInsertions}}</div>
-                <div class="stat-label">💻 新增代码行数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">{{formatNumber netLines}}</div>
-                <div class="stat-label">📈 净增长代码行</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">{{streakStats.longestStreak}}</div>
-                <div class="stat-label">🔥 最长连续天数</div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2 class="section-title">💻 技术栈分析</h2>
-            <div class="language-chart">
-                {{#each languageStats}}
-                <div class="language-item">
-                    <div class="language-name">{{this.name}}</div>
-                    <div class="language-percentage">{{this.percentage}}%</div>
+        <!-- Hero Section -->
+        <header class="hero fade-in">
+            <div class="profile">
+                <div class="avatar">
+                    <i class="fas fa-user-astronaut"></i>
                 </div>
-                {{/each}}
+                <h1>{{author}}</h1>
+                <div class="persona-badge">{{persona.title}}</div>
+                <p class="subtitle">{{persona.description}}</p>
             </div>
-        </div>
 
-        <div class="section">
-            <h2 class="section-title">⏰ 编程时间模式</h2>
-            <p>🌅 最活跃时段分析</p>
-            <div class="time-heatmap">
-                {{#each timeStats}}
-                <div class="hour-cell"
-                    style="background: rgba(99, 102, 241, {{this.opacity}})"
-                    data-count="{{this.count}}"
-                    title="{{this.hour}}:00 - {{this.count}} 次提交">
+            <div class="stats-grid">
+                <div class="stat-card glass">
+                    <div class="icon"><i class="fas fa-code-commit"></i></div>
+                    <div class="value">{{formatNumber totalCommits}}</div>
+                    <div class="label">总提交</div>
                 </div>
-                {{/each}}
+                <div class="stat-card glass">
+                    <div class="icon"><i class="fas fa-code"></i></div>
+                    <div class="value">{{formatNumber netLines}}</div>
+                    <div class="label">代码净增</div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="icon"><i class="fas fa-fire"></i></div>
+                    <div class="value">{{streakStats.longestStreak}} 天</div>
+                    <div class="label">最长连击</div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="icon"><i class="fas fa-calendar-check"></i></div>
+                    <div class="value">{{streakStats.totalActiveDays}} 天</div>
+                    <div class="label">活跃天数</div>
+                </div>
             </div>
-        </div>
+        </header>
 
-        <div class="section">
-            <h2 class="section-title">🎯 项目足迹</h2>
-            <div class="project-list">
-                {{#each projectStats}}
-                <div class="project-item">
-                    <div class="project-name">📁 {{this.name}}</div>
-                    <div class="project-stats">
-                        <div class="project-stat">
-                            <span class="project-stat-value">{{this.commits}}</span>
-                            <span class="project-stat-label">提交次数</span>
-                        </div>
-                        <div class="project-stat">
-                            <span class="project-stat-value">{{this.linesFormatted}}</span>
-                            <span class="project-stat-label">代码行数</span>
-                        </div>
-                        <div class="project-stat">
-                            <span class="project-stat-value">{{this.path}}</span>
-                            <span class="project-stat-label">项目路径</span>
+        <!-- Charts Section -->
+        <section class="charts-section fade-in-delay-1">
+            <div class="chart-container glass">
+                <h3><i class="fas fa-chart-line"></i> 提交趋势</h3>
+                <canvas id="trendChart"></canvas>
+            </div>
+            <div class="chart-container glass">
+                <h3><i class="fas fa-language"></i> 技术栈分布</h3>
+                <canvas id="languageChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Punch Card Section -->
+        <section class="punch-card-section glass fade-in-delay-2">
+            <h3><i class="fas fa-clock"></i> 编程时间分布 (Punch Card)</h3>
+            <div class="punch-card-wrapper">
+                <canvas id="punchCardChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Keywords & Achievements -->
+        <section class="grid-2-cols fade-in-delay-3">
+            <div class="keywords-card glass">
+                <h3><i class="fas fa-tags"></i> 年度关键词</h3>
+                <div class="keyword-cloud">
+                    {{#each topKeywords}}
+                    <span class="keyword" style="font-size: {{this.count}}em; opacity: 0.8;">{{this.word}}</span>
+                    {{/each}}
+                </div>
+            </div>
+
+            <div class="achievements-card glass">
+                <h3><i class="fas fa-trophy"></i> 成就解锁</h3>
+                <div class="achievements-grid">
+                    {{#each achievements}}
+                    <div class="achievement {{#if unlocked}}unlocked{{else}}locked{{/if}}">
+                        <div class="badge">{{this.icon}}</div>
+                        <div class="info">
+                            <h4>{{this.name}}</h4>
+                            <p>{{this.description}}</p>
+                            {{#if progress}}
+                            <div class="progress-bar">
+                                <div class="fill" style="width: 100%"></div>
+                                <span>{{this.progress}}</span>
+                            </div>
+                            {{/if}}
                         </div>
                     </div>
+                    {{/each}}
                 </div>
-                {{/each}}
             </div>
-        </div>
+        </section>
 
-        <div class="footer">
-            <p>🚀 由 Personal Git Report 生成 | {{generatedDate}}</p>
-        </div>
+        <footer class="fade-in-delay-4">
+            <p>Generated by Personal Git Report | {{generatedDate}}</p>
+        </footer>
     </div>
+
+    <script>
+        // Data from Generator
+        const data = {{{ chartData }}};
+
+        // Theme Colors
+        const colors = {
+            primary: '#6c5ce7',
+            secondary: '#00cec9',
+            accent: '#fd79a8',
+            text: '#dfe6e9',
+            grid: 'rgba(255, 255, 255, 0.1)'
+        };
+
+        // 1. Trend Chart
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: data.trends.monthly.map(d => d.date),
+                datasets: [{
+                    label: '月度提交',
+                    data: data.trends.monthly.map(d => d.count),
+                    borderColor: colors.primary,
+                    backgroundColor: 'rgba(108, 92, 231, 0.2)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: colors.grid }, ticks: { color: colors.text } },
+                    x: { grid: { display: false }, ticks: { color: colors.text } }
+                }
+            }
+        });
+
+        // 2. Language Chart
+        new Chart(document.getElementById('languageChart'), {
+            type: 'doughnut',
+            data: {
+                labels: data.languages.map(l => l.name),
+                datasets: [{
+                    data: data.languages.map(l => l.count),
+                    backgroundColor: [
+                        '#6c5ce7', '#00cec9', '#fd79a8', '#fab1a0', '#ffeaa7',
+                        '#55efc4', '#81ecec', '#74b9ff', '#a29bfe', '#dfe6e9'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'right', labels: { color: colors.text } }
+                }
+            }
+        });
+
+        // 3. Punch Card (Bubble Chart)
+        const punchData = [];
+        data.punchCard.forEach((hours, dayIndex) => {
+            hours.forEach((count, hourIndex) => {
+                if (count > 0) {
+                    punchData.push({
+                        x: hourIndex,
+                        y: dayIndex,
+                        r: Math.min(count * 2, 20) // Scale bubble size
+                    });
+                }
+            });
+        });
+
+        const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+        new Chart(document.getElementById('punchCardChart'), {
+            type: 'bubble',
+            data: {
+                datasets: [{
+                    label: '提交热度',
+                    data: punchData,
+                    backgroundColor: colors.accent
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        min: -0.5,
+                        max: 6.5,
+                        ticks: {
+                            callback: (val) => days[val],
+                            stepSize: 1,
+                            color: colors.text
+                        },
+                        grid: { color: colors.grid }
+                    },
+                    x: {
+                        min: -0.5,
+                        max: 23.5,
+                        ticks: { stepSize: 1, color: colors.text },
+                        grid: { color: colors.grid }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
+
 </html>

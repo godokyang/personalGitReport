@@ -152,6 +152,7 @@ export class ReportGenerator {
             generatedDate: new Date().toLocaleDateString(),
             css: css,
             ...this.analysisResult,
+            persona: this.analysisResult.persona, // Explicitly pass persona
             // 预处理一些数据以适应模板
             languageStats: Array.from(this.analysisResult.languageStats.entries())
                 .sort((a, b) => b[1].count - a[1].count)
@@ -161,7 +162,20 @@ export class ReportGenerator {
             projectStats: this.analysisResult.projectStats.map(p => ({
                 ...p,
                 linesFormatted: (p.lines / 1000).toFixed(1) + 'K'
-            }))
+            })),
+            // New Data for Charts
+            chartData: JSON.stringify({
+                trends: this.analysisResult.commitTrends,
+                languages: Array.from(this.analysisResult.languageStats.entries())
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .slice(0, 10)
+                    .map(([name, stats]) => ({ name, count: stats.count })),
+                punchCard: this.analysisResult.punchCard,
+                timeDistribution: {
+                    hours: Array.from(this.analysisResult.timeStats.byHour.entries()).sort((a, b) => a[0] - b[0]),
+                    days: Array.from(this.analysisResult.timeStats.byDayOfWeek.entries()).sort((a, b) => a[0] - b[0])
+                }
+            })
         };
 
         // 编译主模板
