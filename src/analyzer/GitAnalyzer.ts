@@ -67,7 +67,8 @@ export interface GitAnalyzerOptions {
   repositoryPath: string;
   since?: string;
   until?: string;
-  author?: string;
+  author?: string; // 向后兼容，建议使用 authors
+  authors?: string[]; // 多账户支持（邮箱或用户名）
   includeMerges?: boolean;
   excludePaths?: string[];
 }
@@ -80,10 +81,17 @@ export class GitAnalyzer {
   private options: GitAnalyzerOptions;
 
   constructor(options: GitAnalyzerOptions) {
+    // 处理 author 到 authors 的自动转换（向后兼容）
+    let authors = options.authors || [];
+    if (options.author && !options.authors) {
+      authors = [options.author];
+    }
+
     this.options = {
       includeMerges: false,
       excludePaths: [],
       ...options,
+      authors: authors.length > 0 ? authors : undefined,
     };
     this.git = simpleGit(options.repositoryPath);
   }
@@ -142,11 +150,6 @@ export class GitAnalyzer {
       '--format': '%H%n%aI%n%s%n%aN%n%aE', // hash, date(ISO), subject, author name, author email
     };
 
-    // 如果指定了作者，添加过滤条件
-    if (this.options.author) {
-      options['--author'] = this.options.author;
-    }
-
     // 日期范围过滤 (Git原生支持)
     if (this.options.since) {
       options['--since'] = this.options.since;
@@ -175,6 +178,16 @@ export class GitAnalyzer {
    */
   private buildLogArgs(options: any): string[] {
     const args: string[] = [];
+    
+    // 处理多作者筛选
+    if (this.options.authors && this.options.authors.length > 0) {
+      // 为每个作者添加 --author 参数
+      for (const author of this.options.authors) {
+        args.push(`--author=${author}`);
+      }
+    }
+    
+    // 处理其他参数
     for (const [key, value] of Object.entries(options)) {
       if (value === null) {
         args.push(key);

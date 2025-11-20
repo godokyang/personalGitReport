@@ -28,11 +28,13 @@ async function main() {
   // 基础命令
   program
     .argument('[path]', '要分析的Git仓库路径', process.cwd())
-    .option('-y, --year <year>', '指定年份', new Date().getFullYear().toString())
+    .option('-y, --year <year>', '指定年份（最近三年）', new Date().getFullYear().toString())
     .option('-t, --theme <theme>', '主题 (light/dark/colorful)', 'dark')
     .option('-f, --format <format>', '输出格式 (html/json/pdf)', 'html')
     .option('-o, --output <path>', '输出目录', './reports')
-    .option('-a, --author <email>', '指定作者邮箱')
+    .option('-a, --author <email>', '指定作者邮箱（单个，向后兼容）')
+    .option('--authors <emails>', '指定多个作者邮箱，用逗号分隔')
+    .option('--repos-dir <path>', '多仓库目录，自动扫描该目录下的所有Git仓库')
     .option('-c, --config <path>', '配置文件路径')
     .option('--no-interactive', '非交互模式')
     .action(async (repoPath: string, options) => {
@@ -94,12 +96,22 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
   // 加载配置
   const config = await ConfigManager.loadConfig(options.config);
 
+  // 处理多账户参数
+  let authors = config.authors || [];
+  if (options.authors) {
+    authors = options.authors.split(',').map((a: string) => a.trim());
+  } else if (options.author) {
+    authors = [options.author];
+  }
+
   // 命令行参数覆盖配置文件
   const finalConfig = {
     ...config,
     theme: options.theme || config.theme,
     format: [options.format],
     output: options.output || config.output,
+    authors: authors.length > 0 ? authors : undefined,
+    repositoriesDir: options.reposDir || config.repositoriesDir,
   };
 
   // 验证配置
@@ -112,80 +124,133 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
 
   // 交互式配置（如果启用）
   if (options.interactive !== false) {
-    await interactiveConfig(finalConfig, resolvedPath);
+    await interactiveConfig(finalConfig, resolvedPath, year);
+  }
+
+  // 处理多仓库扫描
+  let repositoriesToAnalyze: string[] = [];
+  if (finalConfig.repositoriesDir) {
+    console.log(chalk.blue(`🔍 扫描多仓库目录: ${finalConfig.repositoriesDir}`));
+    repositoriesToAnalyze = ConfigManager.getRepositoryPaths(finalConfig.repositoriesDir, true, 3);
+    console.log(chalk.green(`✅ 找到 ${repositoriesToAnalyze.length} 个Git仓库`));
+    if (repositoriesToAnalyze.length > 0) {
+      console.log(chalk.blue('📋 仓库列表:'));
+      repositoriesToAnalyze.forEach((repo, idx) => {
+        console.log(`  ${idx + 1}. ${chalk.cyan(path.basename(repo))} - ${repo}`);
+      });
+    }
+    console.log('');
+  } else {
+    repositoriesToAnalyze = [resolvedPath];
+  }
+
+  // 如果没有找到仓库，退出
+  if (repositoriesToAnalyze.length === 0) {
+    console.error(chalk.red('❌ 未找到Git仓库'));
+    return;
   }
 
   // 显示配置信息
   console.log(chalk.blue('📋 配置信息:'));
-  console.log(`  📁 项目路径: ${chalk.cyan(resolvedPath)}`);
+  if (repositoriesToAnalyze.length === 1) {
+    console.log(`  📁 项目路径: ${chalk.cyan(repositoriesToAnalyze[0])}`);
+  } else {
+    console.log(`  📁 项目数量: ${chalk.cyan(repositoriesToAnalyze.length)}`);
+  }
   console.log(`  📅 分析年份: ${chalk.cyan(year)}`);
   console.log(`  🎨 主题风格: ${chalk.cyan(finalConfig.theme)}`);
   console.log(`  📄 输出格式: ${chalk.cyan(finalConfig.format.join(', '))}`);
   console.log(`  📂 输出目录: ${chalk.cyan(finalConfig.output)}`);
+  if (finalConfig.authors && finalConfig.authors.length > 0) {
+    console.log(`  👤 筛选账户: ${chalk.cyan(finalConfig.authors.join(', '))}`);
+  }
   console.log('');
 
-  // 开始分析
-  const spinner = ora('🔍 正在分析Git仓库...').start();
-
-  try {
-    // 设置Git分析器选项
-    const analyzerOptions: GitAnalyzerOptions = {
-      repositoryPath: resolvedPath,
-      author: options.author || config.email,
-      includeMerges: finalConfig.includeMerges,
-      excludePaths: finalConfig.excludePaths,
-      since: finalConfig.dateRange?.from,
-      until: finalConfig.dateRange?.to,
-    };
-
-    // 如果没有指定日期范围，按年份分析
-    if (!analyzerOptions.since && !analyzerOptions.until) {
-      analyzerOptions.since = `${year}-01-01`;
-      analyzerOptions.until = `${year}-12-31`;
+  // 分析所有仓库
+  for (let i = 0; i < repositoriesToAnalyze.length; i++) {
+    const currentRepoPath = repositoriesToAnalyze[i];
+    const repoName = path.basename(currentRepoPath);
+    
+    if (repositoriesToAnalyze.length > 1) {
+      console.log(chalk.blue(`\n📊 分析仓库 ${i + 1}/${repositoriesToAnalyze.length}: ${repoName}`));
     }
 
-    // 执行Git分析
-    const analyzer = new GitAnalyzer(analyzerOptions);
-    const analysisResult = await analyzer.analyze();
+    // 开始分析
+    const spinner = ora('🔍 正在分析Git仓库...').start();
 
-    spinner.succeed('✅ Git仓库分析完成！');
+    try {
+      // 设置Git分析器选项
+      const analyzerOptions: GitAnalyzerOptions = {
+        repositoryPath: currentRepoPath,
+        authors: finalConfig.authors,
+        includeMerges: finalConfig.includeMerges,
+        excludePaths: finalConfig.excludePaths,
+        since: finalConfig.dateRange?.from,
+        until: finalConfig.dateRange?.to,
+      };
 
-    // 生成报告
-    const reportSpinner = ora('📊 正在生成年度报告...').start();
+      // 如果没有指定日期范围，按年份分析
+      if (!analyzerOptions.since && !analyzerOptions.until) {
+        analyzerOptions.since = `${year}-01-01`;
+        analyzerOptions.until = `${year}-12-31`;
+      }
 
-    const reportOptions: ReportOptions = {
-      outputPath: finalConfig.output,
-      theme: finalConfig.theme,
-      format: finalConfig.format[0] as 'html' | 'json' | 'pdf',
-      author: finalConfig.author || '开发者',
-      year: year,
-    };
+      // 执行Git分析
+      const analyzer = new GitAnalyzer(analyzerOptions);
+      const analysisResult = await analyzer.analyze();
 
-    const reportGenerator = new ReportGenerator(analysisResult, reportOptions);
-    const reportPath = await reportGenerator.generate();
+      spinner.succeed('✅ Git仓库分析完成！');
 
-    reportSpinner.succeed('✅ 年度报告生成完成！');
+      // 生成报告
+      const reportSpinner = ora('📊 正在生成年度报告...').start();
 
-    // 显示结果
-    console.log('');
-    console.log(chalk.green.bold('🎉 报告生成成功！'));
-    console.log('');
-    console.log(chalk.blue('📊 统计摘要:'));
-    console.log(`  📝 总提交数: ${chalk.yellow(analysisResult.totalCommits.toLocaleString())}`);
-    console.log(`  💻 新增代码: ${chalk.yellow('+' + analysisResult.totalInsertions.toLocaleString())} 行`);
-    console.log(`  🗑️ 删除代码: ${chalk.yellow('-' + analysisResult.totalDeletions.toLocaleString())} 行`);
-    console.log(`  📈 净增长: ${chalk.yellow(analysisResult.netLines.toLocaleString())} 行`);
-    console.log(`  🔥 最长连续: ${chalk.yellow(analysisResult.streakStats.longestStreak)} 天`);
-    console.log(`  🎯 技术栈: ${chalk.yellow(Array.from(analysisResult.languageStats.keys()).slice(0, 3).join(', '))}`);
-    console.log('');
-    console.log(chalk.blue('📄 报告文件:'));
-    console.log(`  📂 ${chalk.cyan(reportPath)}`);
-    console.log('');
+      const reportOptions: ReportOptions = {
+        outputPath: repositoriesToAnalyze.length > 1 
+          ? path.join(finalConfig.output, repoName)
+          : finalConfig.output,
+        theme: finalConfig.theme,
+        format: finalConfig.format[0] as 'html' | 'json' | 'pdf',
+        author: finalConfig.author || repoName,
+        year: year,
+      };
+
+      const reportGenerator = new ReportGenerator(analysisResult, reportOptions);
+      const reportPath = await reportGenerator.generate();
+
+      reportSpinner.succeed('✅ 年度报告生成完成！');
+
+      // 显示结果
+      console.log('');
+      console.log(chalk.green.bold('🎉 报告生成成功！'));
+      console.log('');
+      console.log(chalk.blue('📊 统计摘要:'));
+      console.log(`  📝 总提交数: ${chalk.yellow(analysisResult.totalCommits.toLocaleString())}`);
+      console.log(`  💻 新增代码: ${chalk.yellow('+' + analysisResult.totalInsertions.toLocaleString())} 行`);
+      console.log(`  🗑️ 删除代码: ${chalk.yellow('-' + analysisResult.totalDeletions.toLocaleString())} 行`);
+      console.log(`  📈 净增长: ${chalk.yellow(analysisResult.netLines.toLocaleString())} 行`);
+      console.log(`  🔥 最长连续: ${chalk.yellow(analysisResult.streakStats.longestStreak)} 天`);
+      console.log(`  🎯 技术栈: ${chalk.yellow(Array.from(analysisResult.languageStats.keys()).slice(0, 3).join(', '))}`);
+      console.log('');
+      console.log(chalk.blue('📄 报告文件:'));
+      console.log(`  📂 ${chalk.cyan(reportPath)}`);
+      console.log('');
+
+    } catch (error) {
+      spinner.fail('❌ 分析失败');
+      console.error(chalk.red(`  错误: ${error instanceof Error ? error.message : String(error)}`));
+      if (repositoriesToAnalyze.length > 1) {
+        console.log(chalk.yellow('  跳过此仓库，继续分析下一个...'));
+        continue;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  if (repositoriesToAnalyze.length > 1) {
+    console.log(chalk.green.bold('\n🌟 所有仓库分析完成！'));
+  } else {
     console.log(chalk.green('🌟 快去分享你的年度编程成就吧！'));
-
-  } catch (error) {
-    spinner.fail('❌ 分析失败');
-    throw error;
   }
 }
 
@@ -259,16 +324,34 @@ async function generateMultipleReports(options: any): Promise<void> {
 /**
  * 交互式配置
  */
-async function interactiveConfig(config: GitReportConfig, repoPath: string): Promise<void> {
+async function interactiveConfig(config: GitReportConfig, repoPath: string, currentYear: number): Promise<void> {
   console.log(chalk.blue('🎯 交互式配置 (按Enter使用默认值)'));
   console.log('');
 
+  const availableYears = ConfigManager.getAvailableYears();
+
   const answers = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'year',
+      message: '选择分析年份:',
+      choices: availableYears.map(y => ({
+        name: y === currentYear ? `${y} (当前年份)` : y.toString(),
+        value: y,
+      })),
+      default: currentYear,
+    },
     {
       type: 'input',
       name: 'author',
       message: '显示在报告中的名字:',
       default: config.author || path.basename(repoPath),
+    },
+    {
+      type: 'input',
+      name: 'authors',
+      message: '筛选账户 (多个邮箱/用户名用逗号分隔):',
+      default: config.authors ? config.authors.join(', ') : '',
     },
     {
       type: 'list',
@@ -304,6 +387,11 @@ async function interactiveConfig(config: GitReportConfig, repoPath: string): Pro
   config.theme = answers.theme;
   config.format = answers.format;
   config.output = answers.output;
+  
+  // 处理多账户输入
+  if (answers.authors && answers.authors.trim()) {
+    config.authors = answers.authors.split(',').map((a: string) => a.trim()).filter((a: string) => a);
+  }
 
   console.log('');
 }

@@ -9,7 +9,11 @@ import * as path from 'path';
 export interface GitReportConfig {
   // 基本信息
   author?: string;
-  email?: string;
+  email?: string; // 向后兼容，建议使用 authors
+  authors?: string[]; // 多账户支持（邮箱或用户名）
+
+  // 仓库配置
+  repositoriesDir?: string; // 多仓库目录，自动扫描该目录下的所有 Git 仓库
 
   // 主题设置
   theme: 'light' | 'dark' | 'colorful';
@@ -126,9 +130,16 @@ export class ConfigManager {
    * 合并用户配置与默认配置
    */
   private static mergeWithDefaults(userConfig: Partial<GitReportConfig>): GitReportConfig {
+    // 处理 email 到 authors 的自动转换（向后兼容）
+    let authors = userConfig.authors || [];
+    if (userConfig.email && !userConfig.authors) {
+      authors = [userConfig.email];
+    }
+
     return {
       ...this.DEFAULT_CONFIG,
       ...userConfig,
+      authors: authors.length > 0 ? authors : undefined,
       customStats: {
         ...this.DEFAULT_CONFIG.customStats,
         ...(userConfig.customStats || {}),
@@ -148,7 +159,17 @@ export class ConfigManager {
 module.exports = {
   // 基本信息显示
   author: "你的名字",           // 显示在报告中的名字
-  email: "your-email@example.com", // 用于过滤你的提交
+
+  // 多账户支持（推荐使用 authors 代替 email）
+  authors: [                   // 多个 Git 账户邮箱或用户名
+    "your-email@example.com",
+    "another-email@company.com"
+  ],
+  // email: "your-email@example.com", // 单账户模式（向后兼容）
+
+  // 多仓库目录（可选）
+  // 指定包含多个 Git 仓库的父目录，工具会自动扫描所有子仓库
+  // repositoriesDir: "/Users/yourname/Projects",
 
   // 主题设置
   theme: "dark",               // 主题: 'light' | 'dark' | 'colorful'
@@ -172,6 +193,7 @@ module.exports = {
   ],
 
   // 自定义时间范围（可选）
+  // 注意：年份选择限制为最近三年
   dateRange: {
     from: "2023-01-01",       // 开始日期
     to: "2023-12-31"          // 结束日期
@@ -236,50 +258,90 @@ module.exports = {
 
   /**
    * 获取当前工作目录下的Git仓库路径
+   * @param currentPath 要扫描的目录路径
+   * @param recursive 是否递归扫描子目录（默认为 true）
+   * @param maxDepth 最大扫描深度（默认为 3）
    */
-  static getRepositoryPaths(currentPath: string = process.cwd()): string[] {
+  static getRepositoryPaths(
+    currentPath: string = process.cwd(),
+    recursive: boolean = true,
+    maxDepth: number = 3
+  ): string[] {
     const paths: string[] = [];
 
-    // 检查当前目录是否是Git仓库
-    const gitPath = path.join(currentPath, '.git');
-    if (fs.existsSync(gitPath)) {
-      paths.push(currentPath);
-    }
+    const scanDirectory = (dirPath: string, depth: number = 0) => {
+      // 检查当前目录是否是Git仓库
+      const gitPath = path.join(dirPath, '.git');
+      if (fs.existsSync(gitPath)) {
+        paths.push(dirPath);
+        return; // 找到仓库后不再扫描其子目录
+      }
 
-    // 检查子目录中的Git仓库
-    try {
-      const items = fs.readdirSync(currentPath);
-      for (const item of items) {
-        const itemPath = path.join(currentPath, item);
-        const stat = fs.statSync(itemPath);
+      // 如果不递归或达到最大深度，停止扫描
+      if (!recursive || depth >= maxDepth) {
+        return;
+      }
 
-        if (stat.isDirectory() && !item.startsWith('.')) {
-          const subGitPath = path.join(itemPath, '.git');
-          if (fs.existsSync(subGitPath)) {
-            paths.push(itemPath);
+      // 扫描子目录
+      try {
+        const items = fs.readdirSync(dirPath);
+        for (const item of items) {
+          // 跳过隐藏目录和 node_modules
+          if (item.startsWith('.') || item === 'node_modules') {
+            continue;
+          }
+
+          const itemPath = path.join(dirPath, item);
+          try {
+            const stat = fs.statSync(itemPath);
+            if (stat.isDirectory()) {
+              scanDirectory(itemPath, depth + 1);
+            }
+          } catch (error) {
+            // 忽略无法访问的目录
           }
         }
+      } catch (error) {
+        // 忽略读取错误
       }
-    } catch (error) {
-      // 忽略读取错误
-    }
+    };
 
+    scanDirectory(currentPath);
     return paths;
   }
 
   /**
-   * 解析年份参数
+   * 获取可用的年份列表（最近三年）
+   */
+  static getAvailableYears(): number[] {
+    const currentYear = new Date().getFullYear();
+    return [currentYear, currentYear - 1, currentYear - 2];
+  }
+
+  /**
+   * 解析年份参数（限制为最近三年）
    */
   static parseYear(yearParam?: string | number): number {
+    const currentYear = new Date().getFullYear();
+    const availableYears = this.getAvailableYears();
+
     if (!yearParam) {
-      return new Date().getFullYear();
+      return currentYear;
     }
 
     const year = typeof yearParam === 'string' ? parseInt(yearParam, 10) : yearParam;
 
-    if (isNaN(year) || year < 2000 || year > new Date().getFullYear() + 1) {
+    if (isNaN(year)) {
       console.warn(`⚠️ 无效的年份: ${yearParam}，使用当前年份`);
-      return new Date().getFullYear();
+      return currentYear;
+    }
+
+    // 检查是否在最近三年范围内
+    if (!availableYears.includes(year)) {
+      console.warn(
+        `⚠️ 年份 ${year} 超出范围，只支持最近三年: ${availableYears.join(', ')}，使用当前年份`
+      );
+      return currentYear;
     }
 
     return year;
