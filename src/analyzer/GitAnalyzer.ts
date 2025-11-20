@@ -514,22 +514,30 @@ export class GitAnalyzer {
       {
         id: 'first-commit',
         name: '初出茅庐',
-        description: `完成第一次代码提交 (当前: ${stats.totalCommits} 次)`,
+        description: `完成了人生第一次代码提交,开启了编程之旅。每个伟大的项目都始于第一行代码!`,
         icon: '🌱',
         unlocked: stats.totalCommits > 0,
       },
       {
         id: '100-commits',
         name: '百炼成钢',
-        description: `累计提交达到 100 次 (当前: ${stats.totalCommits} 次)`,
+        description: `累计提交达到 100 次!你已经养成了良好的版本控制习惯,每一次提交都是进步的见证。`,
         icon: '🔨',
         unlocked: stats.totalCommits >= 100,
         progress: `${Math.min(stats.totalCommits, 100)}/100`
       },
       {
+        id: '500-commits',
+        name: '代码老兵',
+        description: `累计提交达到 500 次!你已经是经验丰富的开发者,见证了无数次代码的迭代与演进。`,
+        icon: '🎖️',
+        unlocked: stats.totalCommits >= 500,
+        progress: `${Math.min(stats.totalCommits, 500)}/500`
+      },
+      {
         id: '1000-commits',
         name: '千锤百炼',
-        description: `累计提交达到 1000 次 (当前: ${stats.totalCommits} 次)`,
+        description: `累计提交达到 1000 次!这是一个里程碑,你的坚持和热情令人敬佩。`,
         icon: '⚔️',
         unlocked: stats.totalCommits >= 1000,
         progress: `${Math.min(stats.totalCommits, 1000)}/1000`
@@ -551,7 +559,7 @@ export class GitAnalyzer {
       {
         id: 'consistency-king',
         name: '持之以恒',
-        description: `连续提交超过 7 天 (最长: ${stats.streakStats.longestStreak} 天)`,
+        description: `连续 7 天以上保持提交!你的自律和坚持是成功的关键,最长连击记录: ${stats.streakStats.longestStreak} 天。`,
         icon: '🔥',
         unlocked: stats.streakStats.longestStreak >= 7,
         progress: `${stats.streakStats.longestStreak}/7`
@@ -559,7 +567,7 @@ export class GitAnalyzer {
       {
         id: 'polyglot',
         name: '语言大师',
-        description: `使用超过 5 种编程语言 (当前: ${stats.languageStats.size} 种)`,
+        description: `掌握 5 种以上编程语言!你是真正的全栈开发者,能够在不同技术栈间自由切换。`,
         icon: '🌍',
         unlocked: stats.languageStats.size >= 5,
         progress: `${stats.languageStats.size}/5`
@@ -569,31 +577,42 @@ export class GitAnalyzer {
     // 计算特殊成就
     let nightCommits = 0;
     let weekendCommits = 0;
+    let midnightCommits = 0;
+    const dailyCommits = new Map<string, number>();
+    const bugFixCommits = commits.filter(c => /fix|bug|修复/i.test(c.message)).length;
+    const refactorCommits = commits.filter(c => /refactor|重构/i.test(c.message)).length;
+    const docCommits = commits.filter(c => c.files.some(f => f.endsWith('.md'))).length;
 
     for (const commit of commits) {
       const date = moment(commit.date);
       const hour = date.hour();
       const day = date.day();
+      const dateStr = date.format('YYYY-MM-DD');
 
       if (hour >= 0 && hour < 5) nightCommits++;
+      if (hour >= 0 && hour <= 1) midnightCommits++;
       if (day === 0 || day === 6) weekendCommits++;
+      
+      dailyCommits.set(dateStr, (dailyCommits.get(dateStr) || 0) + 1);
     }
 
+    // 更新夜猫子成就
     const nightOwl = achievements.find(a => a.id === 'night-owl');
     if (nightOwl) {
       nightOwl.unlocked = nightCommits >= 20;
-      nightOwl.description = `在深夜 (0点-5点) 提交代码超过 20 次 (当前: ${nightCommits} 次)`;
+      nightOwl.description = `在深夜 (0点-5点) 提交代码超过 20 次!你是真正的夜行者,在静谧的夜晚创造着代码的魔法。当前: ${nightCommits} 次深夜提交。`;
       nightOwl.progress = `${nightCommits}/20`;
     }
 
+    // 更新周末战士成就
     const weekendWarrior = achievements.find(a => a.id === 'weekend-warrior');
     if (weekendWarrior) {
       weekendWarrior.unlocked = weekendCommits >= 50;
-      weekendWarrior.description = `在周末提交代码超过 50 次 (当前: ${weekendCommits} 次)`;
+      weekendWarrior.description = `在周末提交代码超过 50 次!当别人休息时,你依然在编程的世界里探索。当前: ${weekendCommits} 次周末提交。`;
       weekendWarrior.progress = `${weekendCommits}/50`;
     }
 
-    // 计算更多成就
+    // 早起鸟
     const earlyBird = commits.filter(c => {
       const h = moment(c.date).hour();
       return h >= 5 && h <= 8;
@@ -601,24 +620,106 @@ export class GitAnalyzer {
 
     achievements.push({
       id: 'early-bird',
-      name: '早起鸟',
-      description: `在清晨 (5点-8点) 提交代码超过 10 次 (当前: ${earlyBird} 次)`,
+      name: '早起的鸟儿',
+      description: `在清晨 (5点-8点) 提交代码超过 10 次!一日之计在于晨,你用清晨的时光书写着高质量的代码。当前: ${earlyBird} 次清晨提交。`,
       icon: '🌅',
       unlocked: earlyBird >= 10,
       progress: `${earlyBird}/10`
     });
 
-    // 重构大师
-    const refactorRatio = stats.totalDeletions / (stats.totalInsertions || 1);
+    // 午夜编程者
     achievements.push({
-      id: 'refactor-master',
-      name: '重构大师',
-      description: `删除代码量接近新增代码量 (当前比例: ${refactorRatio.toFixed(2)})`,
-      icon: '🧹',
-      unlocked: refactorRatio > 0.5,
+      id: 'midnight-coder',
+      name: '午夜编程者',
+      description: `在午夜 (0点-1点) 提交代码超过 10 次!你在一天的交界处编写代码,见证着日期的更替。当前: ${midnightCommits} 次午夜提交。`,
+      icon: '🌙',
+      unlocked: midnightCommits >= 10,
+      progress: `${midnightCommits}/10`
     });
 
-    return achievements;
+    // 代码火箭
+    const maxDailyCommits = Math.max(...Array.from(dailyCommits.values()), 0);
+    achievements.push({
+      id: 'code-rocket',
+      name: '代码火箭',
+      description: `单日提交超过 10 次!你的编程效率惊人,在一天内完成了大量的代码迭代。单日最高: ${maxDailyCommits} 次提交。`,
+      icon: '🚀',
+      unlocked: maxDailyCommits >= 10,
+      progress: `${maxDailyCommits}/10`
+    });
+
+    // Bug终结者
+    achievements.push({
+      id: 'bug-terminator',
+      name: 'Bug终结者',
+      description: `提交信息包含"fix"或"bug"超过 30 次!你是团队的守护者,不断修复问题让代码更加健壮。当前: ${bugFixCommits} 次修复提交。`,
+      icon: '🔧',
+      unlocked: bugFixCommits >= 30,
+      progress: `${bugFixCommits}/30`
+    });
+
+    // 重构艺术家
+    achievements.push({
+      id: 'refactor-artist',
+      name: '重构艺术家',
+      description: `提交信息包含"refactor"或"重构"超过 15 次!你深知代码质量的重要性,不断优化和改进现有代码。当前: ${refactorCommits} 次重构提交。`,
+      icon: '🎨',
+      unlocked: refactorCommits >= 15,
+      progress: `${refactorCommits}/15`
+    });
+
+    // 文档达人
+    achievements.push({
+      id: 'doc-master',
+      name: '文档达人',
+      description: `提交包含 Markdown 文件超过 20 次!你明白好的文档和好的代码同样重要,为项目留下了宝贵的知识财富。当前: ${docCommits} 次文档提交。`,
+      icon: '📚',
+      unlocked: docCommits >= 20,
+      progress: `${docCommits}/20`
+    });
+
+    // 质量守护者
+    const avgLinesPerCommit = stats.totalCommits > 0 ? (stats.totalInsertions + stats.totalDeletions) / stats.totalCommits : 0;
+    achievements.push({
+      id: 'quality-guardian',
+      name: '质量守护者',
+      description: `平均每次提交代码行数少于 50 行!你遵循"小步快跑"的原则,每次提交都小而精,易于审查和回滚。平均: ${avgLinesPerCommit.toFixed(1)} 行/提交。`,
+      icon: '💎',
+      unlocked: avgLinesPerCommit > 0 && avgLinesPerCommit < 50,
+    });
+
+    // 代码巨人
+    achievements.push({
+      id: 'code-giant',
+      name: '代码巨人',
+      description: `累计贡献超过 10,000 行代码!你的代码量足以构建一个完整的系统,你是真正的代码生产者。当前: ${stats.netLines.toLocaleString()} 行净增量。`,
+      icon: '🏗️',
+      unlocked: stats.netLines >= 10000,
+      progress: `${Math.min(stats.netLines, 10000).toLocaleString()}/10,000`
+    });
+
+    // 极简主义者
+    const refactorRatio = stats.totalDeletions / (stats.totalInsertions || 1);
+    achievements.push({
+      id: 'minimalist',
+      name: '极简主义者',
+      description: `删除代码量达到新增代码量的 50% 以上!你深知"少即是多"的道理,通过删除冗余代码来提升系统质量。删除/新增比例: ${(refactorRatio * 100).toFixed(1)}%。`,
+      icon: '🧹',
+      unlocked: refactorRatio >= 0.5,
+    });
+
+    // 活跃开发者
+    achievements.push({
+      id: 'active-developer',
+      name: '活跃开发者',
+      description: `活跃天数超过 100 天!你几乎每天都在编程,这份热情和坚持令人钦佩。当前: ${stats.streakStats.totalActiveDays} 天活跃。`,
+      icon: '⚡',
+      unlocked: stats.streakStats.totalActiveDays >= 100,
+      progress: `${stats.streakStats.totalActiveDays}/100`
+    });
+
+    // 只返回已解锁的成就
+    return achievements.filter(a => a.unlocked);
   }
 
   /**

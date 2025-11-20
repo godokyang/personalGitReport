@@ -67,28 +67,27 @@
             <canvas id="punchChart"></canvas>
         </div>
 
-        <div class="charts-grid">
-            <div class="glass">
-                <h3><i class="fas fa-tags"></i> 年度关键词</h3>
-                <div class="keyword-cloud">
-                    {{#each topKeywords}}
-                    <span class="keyword" style="font-size: {{this.count}}em; opacity: 0.8;">{{this.word}}</span>
-                    {{/each}}
-                </div>
+        <div class="glass" style="margin-bottom: 40px;">
+            <h3><i class="fas fa-tags"></i> 年度关键词</h3>
+            <div class="keyword-cloud">
+                {{#each topKeywords}}
+                <span class="keyword" style="font-size: {{this.count}}em; opacity: 0.8;">{{this.word}}</span>
+                {{/each}}
             </div>
-            <div class="glass">
-                <h3><i class="fas fa-trophy"></i> 成就解锁</h3>
-                <div class="achievements-grid">
-                    {{#each achievements}}
-                    <div class="achievement {{#if unlocked}}unlocked{{else}}locked{{/if}}">
-                        <div class="icon">{{this.icon}}</div>
-                        <div class="content">
-                            <h4>{{this.name}}</h4>
-                            <p>{{this.description}}</p>
-                        </div>
+        </div>
+
+        <div class="glass achievements-section" style="margin-bottom: 40px;">
+            <h3><i class="fas fa-trophy"></i> 成就解锁</h3>
+            <div class="achievements-grid">
+                {{#each achievements}}
+                <div class="achievement unlocked">
+                    <div class="icon">{{this.icon}}</div>
+                    <div class="content">
+                        <h4>{{this.name}}</h4>
+                        <p>{{this.description}}</p>
                     </div>
-                    {{/each}}
                 </div>
+                {{/each}}
             </div>
         </div>
 
@@ -135,13 +134,40 @@
                 maintainAspectRatio: false,
                 layout: {
                     padding: {
-                        bottom: 20
+                        top: 10,
+                        bottom: 30,
+                        left: 10,
+                        right: 10
                     }
                 },
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return context[0].label + ' 月';
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    y: { grid: { display: true, borderDash: [5, 5] } },
-                    x: { grid: { display: false } }
+                    y: { 
+                        beginAtZero: true,
+                        grid: { display: true, borderDash: [5, 5] },
+                        ticks: {
+                            padding: 10
+                        }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: {
+                            padding: 10,
+                            callback: function(value, index, values) {
+                                const label = this.getLabelForValue(value);
+                                return label.substring(5) + '月';
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -199,23 +225,44 @@
                     padding: {
                         top: 20,
                         bottom: 40,
-                        left: 20,
+                        left: 40,
                         right: 20
                     }
                 },
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const hour = context.parsed.x;
+                                const day = days[context.parsed.y];
+                                const count = Math.round(context.raw.r / 2);
+                                return `${day} ${hour}:00 - ${count} 次提交`;
+                            }
+                        }
+                    }
+                },
                 scales: {
                     y: {
                         type: 'category',
                         labels: days,
                         grid: { display: false },
-                        offset: true
+                        offset: true,
+                        ticks: {
+                            padding: 10
+                        }
                     },
                     x: {
                         grid: { display: false },
                         min: -1,
                         max: 24,
-                        ticks: { stepSize: 1 }
+                        ticks: { 
+                            stepSize: 2,
+                            padding: 10,
+                            callback: function(value) {
+                                return value >= 0 && value <= 23 ? value + '时' : '';
+                            }
+                        }
                     }
                 }
             }
