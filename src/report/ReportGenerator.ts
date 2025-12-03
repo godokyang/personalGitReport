@@ -132,6 +132,21 @@ export class ReportGenerator {
             return num.toLocaleString();
         });
 
+        // 项目统计辅助函数
+        handlebars.registerHelper('countActiveProjects', (projects: any[]) => {
+            if (!projects) return 0;
+            return projects.filter(p => p.active).length;
+        });
+
+        handlebars.registerHelper('countInactiveProjects', (projects: any[]) => {
+            if (!projects) return 0;
+            return projects.filter(p => !p.active).length;
+        });
+
+        handlebars.registerHelper('gt0', (num: number) => {
+            return num > 0;
+        });
+
         // 读取模板
         const templatePath = path.join(__dirname, '../templates/report_fixed.hbs');
         const stylePath = path.join(__dirname, '../templates/style.hbs');

@@ -9,6 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
+import * as fs from 'fs-extra';
 import * as path from 'path';
 import { GitAnalyzer, GitAnalyzerOptions } from '../analyzer/GitAnalyzer';
 import { ReportGenerator, ReportOptions } from '../report/ReportGenerator';
@@ -83,6 +84,14 @@ async function main() {
 }
 
 /**
+ * 检查路径是否为Git仓库
+ */
+function isGitRepository(dirPath: string): boolean {
+  const gitPath = path.join(dirPath, '.git');
+  return fs.existsSync(gitPath);
+}
+
+/**
  * 生成单个项目报告
  */
 async function generateReport(repoPath: string, options: any): Promise<void> {
@@ -92,6 +101,30 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
   // 解析参数
   const year = ConfigManager.parseYear(options.year);
   const resolvedPath = path.resolve(repoPath);
+
+  // 检查是否为Git仓库，如果不是则扫描子目录
+  let repositoriesToAnalyze: string[] = [];
+  if (isGitRepository(resolvedPath)) {
+    // 指定的路径是Git仓库，直接分析
+    repositoriesToAnalyze = [resolvedPath];
+    console.log(chalk.blue(`📁 分析Git仓库: ${chalk.cyan(resolvedPath)}`));
+  } else {
+    // 指定的路径不是Git仓库，扫描子目录查找所有Git仓库
+    console.log(chalk.blue(`🔍 目录 ${chalk.cyan(resolvedPath)} 不是Git仓库，正在扫描子目录...`));
+    repositoriesToAnalyze = ConfigManager.getRepositoryPaths(resolvedPath, true, 3);
+
+    if (repositoriesToAnalyze.length === 0) {
+      console.error(chalk.red(`❌ 在 ${resolvedPath} 及其子目录中未找到任何Git仓库`));
+      return;
+    }
+
+    console.log(chalk.green(`✅ 找到 ${repositoriesToAnalyze.length} 个Git仓库`));
+    console.log(chalk.blue('📋 仓库列表:'));
+    repositoriesToAnalyze.forEach((repo, idx) => {
+      console.log(`  ${idx + 1}. ${chalk.cyan(path.basename(repo))} - ${repo}`);
+    });
+  }
+  console.log('');
 
   // 加载配置
   const config = await ConfigManager.loadConfig(options.config);
@@ -127,10 +160,9 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
     await interactiveConfig(finalConfig, resolvedPath, year);
   }
 
-  // 处理多仓库扫描
-  let repositoriesToAnalyze: string[] = [];
-  if (finalConfig.repositoriesDir) {
-    console.log(chalk.blue(`🔍 扫描多仓库目录: ${finalConfig.repositoriesDir}`));
+  // 处理额外的多仓库目录扫描（通过配置文件指定）
+  if (finalConfig.repositoriesDir && repositoriesToAnalyze.length === 1 && isGitRepository(repositoriesToAnalyze[0])) {
+    console.log(chalk.blue(`🔍 扫描配置的多仓库目录: ${finalConfig.repositoriesDir}`));
     repositoriesToAnalyze = ConfigManager.getRepositoryPaths(finalConfig.repositoriesDir, true, 3);
     console.log(chalk.green(`✅ 找到 ${repositoriesToAnalyze.length} 个Git仓库`));
     if (repositoriesToAnalyze.length > 0) {
@@ -140,14 +172,6 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
       });
     }
     console.log('');
-  } else {
-    repositoriesToAnalyze = [resolvedPath];
-  }
-
-  // 如果没有找到仓库，退出
-  if (repositoriesToAnalyze.length === 0) {
-    console.error(chalk.red('❌ 未找到Git仓库'));
-    return;
   }
 
   // 显示配置信息
@@ -167,10 +191,16 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
   console.log('');
 
   // 分析所有仓库
+  const analysisResults: Array<{
+    result: any;
+    projectPath: string;
+    projectName: string;
+  }> = [];
+
   for (let i = 0; i < repositoriesToAnalyze.length; i++) {
     const currentRepoPath = repositoriesToAnalyze[i];
     const repoName = path.basename(currentRepoPath);
-    
+
     if (repositoriesToAnalyze.length > 1) {
       console.log(chalk.blue(`\n📊 分析仓库 ${i + 1}/${repositoriesToAnalyze.length}: ${repoName}`));
     }
@@ -201,39 +231,12 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
 
       spinner.succeed('✅ Git仓库分析完成！');
 
-      // 生成报告
-      const reportSpinner = ora('📊 正在生成年度报告...').start();
-
-      const reportOptions: ReportOptions = {
-        outputPath: repositoriesToAnalyze.length > 1 
-          ? path.join(finalConfig.output, repoName)
-          : finalConfig.output,
-        theme: finalConfig.theme,
-        format: finalConfig.format[0] as 'html' | 'json' | 'pdf',
-        author: finalConfig.author || repoName,
-        year: year,
-      };
-
-      const reportGenerator = new ReportGenerator(analysisResult, reportOptions);
-      const reportPath = await reportGenerator.generate();
-
-      reportSpinner.succeed('✅ 年度报告生成完成！');
-
-      // 显示结果
-      console.log('');
-      console.log(chalk.green.bold('🎉 报告生成成功！'));
-      console.log('');
-      console.log(chalk.blue('📊 统计摘要:'));
-      console.log(`  📝 总提交数: ${chalk.yellow(analysisResult.totalCommits.toLocaleString())}`);
-      console.log(`  💻 新增代码: ${chalk.yellow('+' + analysisResult.totalInsertions.toLocaleString())} 行`);
-      console.log(`  🗑️ 删除代码: ${chalk.yellow('-' + analysisResult.totalDeletions.toLocaleString())} 行`);
-      console.log(`  📈 净增长: ${chalk.yellow(analysisResult.netLines.toLocaleString())} 行`);
-      console.log(`  🔥 最长连续: ${chalk.yellow(analysisResult.streakStats.longestStreak)} 天`);
-      console.log(`  🎯 技术栈: ${chalk.yellow(Array.from(analysisResult.languageStats.keys()).slice(0, 3).join(', '))}`);
-      console.log('');
-      console.log(chalk.blue('📄 报告文件:'));
-      console.log(`  📂 ${chalk.cyan(reportPath)}`);
-      console.log('');
+      // 保存分析结果
+      analysisResults.push({
+        result: analysisResult,
+        projectPath: currentRepoPath,
+        projectName: repoName,
+      });
 
     } catch (error) {
       spinner.fail('❌ 分析失败');
@@ -247,9 +250,120 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
     }
   }
 
+  // 生成汇总报告
   if (repositoriesToAnalyze.length > 1) {
+    // 多项目：生成汇总报告
+    console.log(chalk.blue(`\n📊 正在生成 ${analysisResults.length} 个项目的汇总报告...`));
+    const mergeSpinner = ora('🔗 正在合并分析数据...').start();
+
+    try {
+      // 导入合并方法
+      const { GitAnalyzer } = await import('../analyzer/GitAnalyzer');
+      const mergedResult = GitAnalyzer.mergeAnalysisResults(analysisResults);
+
+      mergeSpinner.succeed('✅ 数据合并完成！');
+
+      // 生成汇总报告
+      const reportSpinner = ora('📄 正在生成汇总报告...').start();
+
+      const reportOptions: ReportOptions = {
+        outputPath: finalConfig.output,
+        theme: finalConfig.theme,
+        format: finalConfig.format[0] as 'html' | 'json' | 'pdf',
+        author: finalConfig.author || '多项目分析',
+        year: year,
+      };
+
+      const reportGenerator = new ReportGenerator(mergedResult, reportOptions);
+      const reportPath = await reportGenerator.generate();
+
+      reportSpinner.succeed('✅ 汇总报告生成完成！');
+
+      // 显示汇总结果
+      console.log('');
+      console.log(chalk.green.bold('🎉 多项目汇总报告生成成功！'));
+      console.log('');
+      console.log(chalk.blue('📊 项目统计:'));
+
+      const activeProjects = mergedResult.projectDetails.filter(p => p.active);
+      const inactiveProjects = mergedResult.projectDetails.filter(p => !p.active);
+
+      console.log(`  🔥 活跃项目: ${chalk.yellow(activeProjects.length)} 个`);
+      console.log(`  💤 静态项目: ${chalk.yellow(inactiveProjects.length)} 个`);
+      console.log('');
+
+      if (activeProjects.length > 0) {
+        console.log(chalk.blue('💻 活跃项目列表:'));
+        activeProjects.slice(0, 10).forEach((project, idx) => {
+          const rank = idx + 1;
+          const emoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🏅';
+          console.log(`  ${emoji} ${chalk.cyan(project.name)}: ${chalk.yellow(project.commits)} 次提交, ${chalk.yellow('+' + project.lines)} 行`);
+        });
+
+        if (activeProjects.length > 10) {
+          console.log(`     ... 还有 ${activeProjects.length - 10} 个项目`);
+        }
+        console.log('');
+      }
+
+      console.log(chalk.blue('📈 汇总统计:'));
+      console.log(`  📝 总提交数: ${chalk.yellow(mergedResult.totalCommits.toLocaleString())}`);
+      console.log(`  💻 新增代码: ${chalk.yellow('+' + mergedResult.totalInsertions.toLocaleString())} 行`);
+      console.log(`  🗑️ 删除代码: ${chalk.yellow('-' + mergedResult.totalDeletions.toLocaleString())} 行`);
+      console.log(`  📈 净增长: ${chalk.yellow(mergedResult.netLines.toLocaleString())} 行`);
+      console.log(`  🔥 最长连续: ${chalk.yellow(mergedResult.streakStats.longestStreak)} 天`);
+      console.log(`  🎯 技术栈: ${chalk.yellow(Array.from(mergedResult.languageStats.keys()).slice(0, 5).join(', '))}`);
+      console.log('');
+      console.log(chalk.blue('📄 报告文件:'));
+      console.log(`  📂 ${chalk.cyan(reportPath)}`);
+      console.log('');
+
+    } catch (error) {
+      mergeSpinner.fail('❌ 汇总失败');
+      console.error(chalk.red(`错误: ${error instanceof Error ? error.message : String(error)}`));
+    }
+
     console.log(chalk.green.bold('\n🌟 所有仓库分析完成！'));
   } else {
+    // 单项目：生成单个报告
+    const singleResult = analysisResults[0];
+    const reportSpinner = ora('📊 正在生成年度报告...').start();
+
+    try {
+      const reportOptions: ReportOptions = {
+        outputPath: finalConfig.output,
+        theme: finalConfig.theme,
+        format: finalConfig.format[0] as 'html' | 'json' | 'pdf',
+        author: finalConfig.author || singleResult.projectName,
+        year: year,
+      };
+
+      const reportGenerator = new ReportGenerator(singleResult.result, reportOptions);
+      const reportPath = await reportGenerator.generate();
+
+      reportSpinner.succeed('✅ 年度报告生成完成！');
+
+      // 显示结果
+      console.log('');
+      console.log(chalk.green.bold('🎉 报告生成成功！'));
+      console.log('');
+      console.log(chalk.blue('📊 统计摘要:'));
+      console.log(`  📝 总提交数: ${chalk.yellow(singleResult.result.totalCommits.toLocaleString())}`);
+      console.log(`  💻 新增代码: ${chalk.yellow('+' + singleResult.result.totalInsertions.toLocaleString())} 行`);
+      console.log(`  🗑️ 删除代码: ${chalk.yellow('-' + singleResult.result.totalDeletions.toLocaleString())} 行`);
+      console.log(`  📈 净增长: ${chalk.yellow(singleResult.result.netLines.toLocaleString())} 行`);
+      console.log(`  🔥 最长连续: ${chalk.yellow(singleResult.result.streakStats.longestStreak)} 天`);
+      console.log(`  🎯 技术栈: ${chalk.yellow(Array.from(singleResult.result.languageStats.keys()).slice(0, 3).join(', '))}`);
+      console.log('');
+      console.log(chalk.blue('📄 报告文件:'));
+      console.log(`  📂 ${chalk.cyan(reportPath)}`);
+      console.log('');
+
+    } catch (error) {
+      reportSpinner.fail('❌ 报告生成失败');
+      console.error(chalk.red(`错误: ${error instanceof Error ? error.message : String(error)}`));
+    }
+
     console.log(chalk.green('🌟 快去分享你的年度编程成就吧！'));
   }
 }

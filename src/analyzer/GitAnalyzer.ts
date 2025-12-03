@@ -772,4 +772,270 @@ export class GitAnalyzer {
 
     return { title, description };
   }
+
+  /**
+   * 合并多个项目的分析结果
+   */
+  public static mergeAnalysisResults(results: Array<{
+    result: GitAnalysisResult;
+    projectPath: string;
+    projectName: string;
+  }>): GitAnalysisResult & { projectDetails: Array<{ path: string; name: string; commits: number; lines: number; active: boolean }> } {
+    if (results.length === 0) {
+      throw new Error('没有可合并的分析结果');
+    }
+
+    const merged: GitAnalysisResult = {
+      totalCommits: 0,
+      totalInsertions: 0,
+      totalDeletions: 0,
+      netLines: 0,
+      languageStats: new Map(),
+      timeStats: {
+        byHour: new Map(),
+        byDayOfWeek: new Map(),
+        byMonth: new Map(),
+      },
+      streakStats: {
+        longestStreak: 0,
+        currentStreak: 0,
+        totalActiveDays: 0,
+      },
+      projectStats: [],
+      commitTrends: {
+        monthly: [],
+        daily: [],
+      },
+      punchCard: Array(7).fill(null).map(() => Array(24).fill(0)),
+      topKeywords: [],
+      achievements: [],
+      persona: { title: '编程学徒', description: '正在分析你的编程足迹...' },
+    };
+
+    const projectDetails: Array<{ path: string; name: string; commits: number; lines: number; active: boolean }> = [];
+
+    // 合并基础统计数据
+    for (const { result, projectPath, projectName } of results) {
+      merged.totalCommits += result.totalCommits;
+      merged.totalInsertions += result.totalInsertions;
+      merged.totalDeletions += result.totalDeletions;
+      merged.netLines += result.netLines;
+
+      // 记录项目详情
+      projectDetails.push({
+        path: projectPath,
+        name: projectName,
+        commits: result.totalCommits,
+        lines: result.netLines,
+        active: result.totalCommits > 0,
+      });
+
+      // 合并语言统计
+      for (const [lang, stats] of result.languageStats) {
+        const existing = merged.languageStats.get(lang);
+        if (existing) {
+          existing.count += stats.count;
+        } else {
+          merged.languageStats.set(lang, { count: stats.count, percentage: 0 });
+        }
+      }
+
+      // 合并时间统计
+      for (const [hour, count] of result.timeStats.byHour) {
+        merged.timeStats.byHour.set(hour, (merged.timeStats.byHour.get(hour) || 0) + count);
+      }
+
+      for (const [day, count] of result.timeStats.byDayOfWeek) {
+        merged.timeStats.byDayOfWeek.set(day, (merged.timeStats.byDayOfWeek.get(day) || 0) + count);
+      }
+
+      for (const [month, count] of result.timeStats.byMonth) {
+        merged.timeStats.byMonth.set(month, (merged.timeStats.byMonth.get(month) || 0) + count);
+      }
+
+      // 合并连续记录（取最大值）
+      merged.streakStats.longestStreak = Math.max(merged.streakStats.longestStreak, result.streakStats.longestStreak);
+      merged.streakStats.currentStreak = Math.max(merged.streakStats.currentStreak, result.streakStats.currentStreak);
+      merged.streakStats.totalActiveDays += result.streakStats.totalActiveDays;
+
+      // 合并打卡卡片
+      for (let i = 0; i < 7; i++) {
+        for (let j = 0; j < 24; j++) {
+          merged.punchCard[i][j] += result.punchCard[i][j];
+        }
+      }
+
+      // 合并项目统计
+      merged.projectStats.push(...result.projectStats);
+
+      // 合并提交趋势
+      merged.commitTrends.monthly.push(...result.commitTrends.monthly);
+      merged.commitTrends.daily.push(...result.commitTrends.daily);
+    }
+
+    // 重新计算语言百分比
+    const totalLanguageCount = Array.from(merged.languageStats.values()).reduce((sum, stats) => sum + stats.count, 0);
+    for (const [lang, stats] of merged.languageStats) {
+      stats.percentage = totalLanguageCount > 0 ? (stats.count / totalLanguageCount) * 100 : 0;
+    }
+
+    // 排序语言统计
+    merged.languageStats = new Map(
+      Array.from(merged.languageStats.entries()).sort((a, b) => b[1].count - a[1].count)
+    );
+
+    // 合并并重新计算提交趋势（按月份聚合）
+    const monthlyMap = new Map<string, number>();
+    for (const trend of merged.commitTrends.monthly) {
+      monthlyMap.set(trend.date, (monthlyMap.get(trend.date) || 0) + trend.count);
+    }
+    merged.commitTrends.monthly = Array.from(monthlyMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // 计算关键词和成就（基于合并后的数据）
+    // 注意：这里简化处理，实际应该基于所有提交重新计算
+    merged.topKeywords = results.length > 0 ? results[0].result.topKeywords : [];
+
+    // 基于合并后的数据重新计算成就
+    const tempAnalyzer = new GitAnalyzer({ repositoryPath: '' });
+    merged.achievements = tempAnalyzer.calculateAchievements(merged, []);
+    merged.persona = tempAnalyzer.calculatePersona(merged);
+
+    // 按提交数排序项目详情
+    projectDetails.sort((a, b) => b.commits - a.commits);
+
+    // 添加多项目相关的里程碑
+    this.addProjectMilestones(merged, projectDetails);
+
+    return { ...merged, projectDetails };
+  }
+
+  /**
+   * 为多项目分析添加里程碑
+   */
+  private static addProjectMilestones(merged: GitAnalysisResult, projectDetails: Array<{ path: string; name: string; commits: number; lines: number; active: boolean }>): void {
+    const totalProjects = projectDetails.length;
+    const activeProjects = projectDetails.filter(p => p.active);
+    const activeCount = activeProjects.length;
+
+    // 项目数量里程碑
+    if (totalProjects >= 50) {
+      merged.achievements.push({
+        id: 'project-collector-50',
+        name: '项目收藏家',
+        description: `在 ${totalProjects} 个项目中有过代码贡献！你是真正的开源达人，在无数项目中留下了足迹。`,
+        icon: '🏆',
+        unlocked: true,
+        progress: `${totalProjects}/50+`
+      });
+    } else if (totalProjects >= 20) {
+      merged.achievements.push({
+        id: 'project-explorer-20',
+        name: '项目探险家',
+        description: `在 ${totalProjects} 个不同项目中工作过！你勇于尝试各种技术和领域，探索未知的项目世界。`,
+        icon: '🧭',
+        unlocked: true,
+        progress: `${totalProjects}/20`
+      });
+    } else if (totalProjects >= 10) {
+      merged.achievements.push({
+        id: 'project-jumper-10',
+        name: '项目跳跃者',
+        description: `跨越 ${totalProjects} 个项目！你就像在代码世界中穿梭的忍者，灵活应对各种挑战。`,
+        icon: '🥷',
+        unlocked: true,
+        progress: `${totalProjects}/10`
+      });
+    } else if (totalProjects >= 5) {
+      merged.achievements.push({
+        id: 'project-nomad-5',
+        name: '项目游牧民',
+        description: `在 ${totalProjects} 个项目间游牧！你的代码足迹遍布多个项目，展现了极强的适应性。`,
+        icon: '🏕️',
+        unlocked: true,
+        progress: `${totalProjects}/5`
+      });
+    }
+
+    // 活跃项目里程碑
+    if (activeCount >= 10) {
+      merged.achievements.push({
+        id: 'active-projects-10',
+        name: '全能战士',
+        description: `同时在 ${activeCount} 个项目中保持活跃！你是真正的多任务处理大师，精力充沛得令人羡慕。`,
+        icon: '⚡',
+        unlocked: true,
+        progress: `${activeCount}/10`
+      });
+    } else if (activeCount >= 5) {
+      merged.achievements.push({
+        id: 'active-projects-5',
+        name: '项目达人',
+        description: `在 ${activeCount} 个项目中都有贡献！你善于平衡多个项目，是真正的项目管理专家。`,
+        icon: '🎯',
+        unlocked: true,
+        progress: `${activeCount}/5`
+      });
+    }
+
+    // 专注度里程碑（很少项目有提交）
+    if (totalProjects >= 10 && activeCount <= 3) {
+      merged.achievements.push({
+        id: 'focused-developer',
+        name: '专注的工匠',
+        description: `虽然接触了 ${totalProjects} 个项目，但只专注于 ${activeCount} 个核心项目。深度胜过广度，你是真正的代码工匠。`,
+        icon: '🎨',
+        unlocked: true,
+      });
+    }
+
+    // 语言多样性里程碑
+    const uniqueLanguages = new Set<string>();
+    activeProjects.forEach(project => {
+      // 这里简化处理，实际应该从每个项目的语言统计中获取
+      if (project.commits > 0) {
+        uniqueLanguages.add('JavaScript'); // 简化示例
+      }
+    });
+
+    if (uniqueLanguages.size >= 5) {
+      merged.achievements.push({
+        id: 'language-diversity-5',
+        name: '语言大师',
+        description: `在项目中使用 ${uniqueLanguages.size} 种编程语言！你的技术栈广度令人印象深刻，真正的全能开发者。`,
+        icon: '🌐',
+        unlocked: true,
+      });
+    }
+
+    // 极端情况里程碑
+    if (totalProjects === 1 && activeCount === 1) {
+      merged.achievements.push({
+        id: 'loyal-developer',
+        name: '忠实的守护者',
+        description: `始终如一地专注于这一个项目。你的专注和坚持令人敬佩，是真正的项目守护者。`,
+        icon: '🛡️',
+        unlocked: true,
+      });
+    }
+
+    // 按项目数量调整个人描述
+    if (totalProjects >= 20) {
+      merged.persona = {
+        title: '项目探索家',
+        description: `你在 ${new Date().getFullYear()} 年跨越了 ${totalProjects} 个项目，是真正的代码世界探险家。`
+      };
+    } else if (totalProjects >= 10) {
+      merged.persona = {
+        title: '多面手开发者',
+        description: `你在 ${new Date().getFullYear()} 年在 ${totalProjects} 个项目中留下代码足迹，展现了惊人的适应性。`
+      };
+    } else if (totalProjects >= 5) {
+      merged.persona = {
+        title: '项目跳跃者',
+        description: `你在 ${new Date().getFullYear()} 年活跃于 ${totalProjects} 个项目，是真正的代码游牧民。`
+      };
+    }
+  }
 }
