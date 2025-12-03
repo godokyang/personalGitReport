@@ -150,12 +150,12 @@ export class GitAnalyzer {
       '--format': '%H%n%aI%n%s%n%aN%n%aE', // hash, date(ISO), subject, author name, author email
     };
 
-    // 日期范围过滤 (Git原生支持)
+    // 日期范围过滤 (Git原生支持) - 添加时间部分确保正确解析
     if (this.options.since) {
-      options['--since'] = this.options.since;
+      options['--since'] = `${this.options.since} 00:00:00`;
     }
     if (this.options.until) {
-      options['--until'] = this.options.until;
+      options['--until'] = `${this.options.until} 23:59:59`;
     }
 
     // 排除合并提交
@@ -164,8 +164,23 @@ export class GitAnalyzer {
     }
 
     try {
-      // 获取原始日志输出
-      const logOutput = await this.git.raw(['log', ...this.buildLogArgs(options)]);
+      // 获取原始日志输出 - 直接传递options而不是调用buildLogArgs
+      const args = Object.entries(options).flatMap(([key, value]) => {
+        if (value === null) {
+          return [key];
+        } else {
+          return [`${key}=${value}`];
+        }
+      });
+
+      // 添加作者筛选参数
+      if (this.options.authors && this.options.authors.length > 0) {
+        this.options.authors.forEach(author => {
+          args.push(`--author=${author}`);
+        });
+      }
+
+                const logOutput = await this.git.raw(['log', ...args]);
       return this.parseRawLog(logOutput);
     } catch (error) {
       console.error('获取Git日志失败:', error);
@@ -178,15 +193,14 @@ export class GitAnalyzer {
    */
   private buildLogArgs(options: any): string[] {
     const args: string[] = [];
-    
-    // 处理多作者筛选
+
+    // 处理多作者筛选 - 为每个作者添加单独的 --author 参数
     if (this.options.authors && this.options.authors.length > 0) {
-      // 为每个作者添加 --author 参数
-      for (const author of this.options.authors) {
+      this.options.authors.forEach(author => {
         args.push(`--author=${author}`);
-      }
+      });
     }
-    
+
     // 处理其他参数
     for (const [key, value] of Object.entries(options)) {
       if (value === null) {

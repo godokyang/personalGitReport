@@ -99,7 +99,7 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
   console.log('');
 
   // 解析参数
-  const year = ConfigManager.parseYear(options.year);
+  let year = ConfigManager.parseYear(options.year);
   const resolvedPath = path.resolve(repoPath);
 
   // 检查是否为Git仓库，如果不是则扫描子目录
@@ -129,23 +129,21 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
   // 加载配置
   const config = await ConfigManager.loadConfig(options.config);
 
-  // 处理多账户参数
-  let authors = config.authors || [];
-  if (options.authors) {
-    authors = options.authors.split(',').map((a: string) => a.trim());
-  } else if (options.author) {
-    authors = [options.author];
-  }
-
   // 命令行参数覆盖配置文件
-  const finalConfig = {
+  const finalConfig: GitReportConfig = {
     ...config,
     theme: options.theme || config.theme,
     format: [options.format],
     output: options.output || config.output,
-    authors: authors.length > 0 ? authors : undefined,
     repositoriesDir: options.reposDir || config.repositoriesDir,
   };
+
+  // 命令行指定的作者参数优先
+  if (options.authors) {
+    finalConfig.authors = options.authors.split(',').map((a: string) => a.trim());
+  } else if (options.author) {
+    finalConfig.authors = [options.author];
+  }
 
   // 验证配置
   const validation = ConfigManager.validateConfig(finalConfig);
@@ -157,8 +155,20 @@ async function generateReport(repoPath: string, options: any): Promise<void> {
 
   // 交互式配置（如果启用）
   if (options.interactive !== false) {
-    await interactiveConfig(finalConfig, resolvedPath, year);
-  }
+    const interactiveAnswers = await interactiveConfig(finalConfig, resolvedPath, year);
+
+    // 使用交互式选择的配置覆盖现有配置
+    let selectedYear = interactiveAnswers.year;
+    finalConfig.theme = interactiveAnswers.theme as 'light' | 'dark' | 'colorful';
+    finalConfig.format = interactiveAnswers.format as Array<'html' | 'json' | 'pdf'>;
+    finalConfig.output = interactiveAnswers.output;
+    finalConfig.authors = interactiveAnswers.authors;
+    finalConfig.author = interactiveAnswers.author;
+
+    // 更新年份变量
+    year = selectedYear;
+
+      }
 
   // 处理额外的多仓库目录扫描（通过配置文件指定）
   if (finalConfig.repositoriesDir && repositoriesToAnalyze.length === 1 && isGitRepository(repositoriesToAnalyze[0])) {
@@ -438,7 +448,14 @@ async function generateMultipleReports(options: any): Promise<void> {
 /**
  * 交互式配置
  */
-async function interactiveConfig(config: GitReportConfig, repoPath: string, currentYear: number): Promise<void> {
+async function interactiveConfig(config: GitReportConfig, repoPath: string, currentYear: number): Promise<{
+  year: number;
+  author: string;
+  authors?: string[];
+  theme: string;
+  format: string[];
+  output: string;
+}> {
   console.log(chalk.blue('🎯 交互式配置 (按Enter使用默认值)'));
   console.log('');
 
@@ -464,7 +481,7 @@ async function interactiveConfig(config: GitReportConfig, repoPath: string, curr
     {
       type: 'input',
       name: 'authors',
-      message: '筛选账户 (多个邮箱/用户名用逗号分隔):',
+      message: '筛选账户 (多个邮箱/用户名用逗号分隔，留空则统计所有账户):',
       default: config.authors ? config.authors.join(', ') : '',
     },
     {
@@ -496,18 +513,22 @@ async function interactiveConfig(config: GitReportConfig, repoPath: string, curr
     },
   ]);
 
-  // 更新配置
-  config.author = answers.author;
-  config.theme = answers.theme;
-  config.format = answers.format;
-  config.output = answers.output;
-  
   // 处理多账户输入
+  let authors: string[] | undefined;
   if (answers.authors && answers.authors.trim()) {
-    config.authors = answers.authors.split(',').map((a: string) => a.trim()).filter((a: string) => a);
+    authors = answers.authors.split(',').map((a: string) => a.trim()).filter((a: string) => a);
   }
 
   console.log('');
+
+  return {
+    year: answers.year,
+    author: answers.author,
+    authors: authors,
+    theme: answers.theme,
+    format: answers.format,
+    output: answers.output,
+  };
 }
 
 // 启动程序
